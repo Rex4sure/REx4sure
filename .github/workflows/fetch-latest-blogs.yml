@@ -1,42 +1,36 @@
 name: Fetch Latest Blogs
 
 on:
+  push:
+    branches:
+      - main  # Trigger when pushing to the main branch
+  workflow_dispatch:  # Manually triggerable
   schedule:
-    - cron: '0 0 * * *'  # This will run the action daily
-  workflow_dispatch:  # You can manually trigger the workflow too
+    - cron: "0 * * * *"  # Run every hour (adjust the cron timing if needed)
 
 jobs:
-  fetch-blogs:
+  update-readme:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v2
 
-    - name: Fetch latest blog posts from Hashnode
-      run: |
-        # Set the Hashnode API URL and your username
-        HASHNODE_USERNAME="thewood"
-        HASHNODE_API="https://api.hashnode.com/"
-        
-        # Query to fetch the latest 4 blog posts
-        QUERY='{
-          "query": "{user(username: \"'$HASHNODE_USERNAME'\") {publication {posts(page: 0, limit: 4) {title slug}}}}"
-        }'
-        
-        # Fetch data from Hashnode API
-        response=$(curl -s -X POST $HASHNODE_API -H "Content-Type: application/json" -d "$QUERY")
-        
-        # Extract the latest 4 posts
-        posts=$(echo $response | jq -r '.data.user.publication.posts | map("* [\(.title)](https://thewood.hashnode.dev/post/\(.slug))") | join("\n")')
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
 
-        # Insert posts into the README file
-        sed -i "/<!-- BLOG-POST-LIST:START -->/,+1c\\
-<!-- BLOG-POST-LIST:START -->\n$posts\n<!-- BLOG-POST-LIST:END -->" README.md
+      - name: Install requests
+        run: pip install requests
 
-    - name: Commit updated README
-      uses: EndBug/add-and-commit@v7
-      with:
-        author_name: 'GitHub Actions'
-        author_email: 'actions@github.com'
-        message: 'Update latest blog posts'
+      - name: Fetch Latest Blog Posts
+        run: |
+          python fetch_latest_blogs.py
+          
+      - name: Commit updated README
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add README.md
+          git commit -m "Update README with latest blog posts"
+          git push
